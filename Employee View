@@ -1,0 +1,124 @@
+/*
+ *
+ *
+ * Author: Josh Sampson
+ *
+ * Date: 12-11-20
+ */
+
+import java.sql.*;
+import java.io.*;
+
+class employee
+{
+
+    static BufferedReader keyboard;
+    static Connection conn; 
+    static Statement stmt;  
+
+    public static void main (String args [])
+	throws IOException
+    {
+	String username="user", password = "Password";
+	String ename;
+	int original_empno=0;
+	int empno;
+
+	keyboard = new BufferedReader(new InputStreamReader (System.in));
+
+	try { 
+
+	   DriverManager.registerDriver(new oracle.jdbc.driver.OracleDriver());
+
+            System.out.println("Registered the driver...");
+
+	    conn = DriverManager.getConnection (
+                   "jdbc:oracle:thin:@oracle1.wiu.edu:1521/toolman.wiu.edu",
+		    username, password);
+
+	    conn.setAutoCommit(false);
+
+            System.out.println("logged into oracle as " + username);
+
+	    stmt = conn.createStatement ();
+
+	while(true){
+		int choice;
+		System.out.println("Press 1 to see the schedule or your time card, 2 to update your hours, or 3 to exit");
+		choice = Integer.parseInt(keyboard.readLine());
+		String n;
+		switch (choice){
+			case 1:
+				System.out.println("Press 1 to see the schedule, 2 to see your time card: ");
+				choice = Integer.parseInt(keyboard.readLine());
+				if(choice == 1){
+					ShowSched();
+				}
+				else{
+					System.out.println("Enter your Name (ex. John Smith) ");
+					n = keyboard.readLine();
+					GetTimeCard(n);//funtion to show just their tiime card
+				}
+				break;
+			case 2:
+				System.out.println("Enter Name: ");
+				n = keyboard.readLine();
+				System.out.println("Enter hours:(ex 10, 15, etc) ");
+				int m = Integer.parseInt(keyboard.readLine());
+				UpdateTimeCard(n, m);//function to update hours and show new hours
+				GetTimeCard(n);
+				break;
+			case 3:
+				System.exit(0);
+		}
+	}
+	}
+
+	catch(SQLException e)
+	    {
+		System.out.println("Caught SQL Exception: \n     " + e);
+	    }
+    }
+	public static void ShowSched() throws SQLException{// shows enitire schedule
+		String query = ("SELECT * FROM EmpSched");
+		String col1 = "Employeee name";
+		String col2 = "Show Name";
+		ResultSet SS = stmt.executeQuery(query);
+		ResultSetMetaData rsmd = SS.getMetaData();
+		int colCount = rsmd.getColumnCount();
+		System.out.printf("%-30.30s %30.30s%n", col1, col2);
+		while(SS.next()){
+			for(int i = 1; i<= colCount; i++){
+				System.out.printf("%30.30s", SS.getString(i));
+			}
+			System.out.println();
+		}
+		SS.close();
+	}
+	public static void GetTimeCard(String n) throws SQLException{// gets specific employees time card using hashing to do it faster
+		String query = ("SELECT * FROM EmpTime WHERE Name = '" + n + "'" );
+		String col1 = "Name";
+		String col2 = "Hours";
+		ResultSet GTC = stmt.executeQuery(query);
+		ResultSetMetaData rsmd = GTC.getMetaData();
+		int colCount = rsmd.getColumnCount();
+		System.out.printf("%-30.30s %30.30s%n", col1, col2);
+		while(GTC.next()){
+			for(int i = 1; i<= colCount; i++){
+				System.out.printf("%30.30s", GTC.getString(i));
+			}
+			System.out.println();
+		} 
+		GTC.close();
+	}
+	public static void UpdateTimeCard(String n, int t) throws SQLException{//update hours worked
+		String query = ("UPDATE TimeCard_hash SET Hours = " + t + " WHERE Name = '" + n + "'");
+		Statement ins = conn.createStatement();
+		ins.executeUpdate(query);
+		conn.commit();
+		ins.close();
+	}
+}
+
+
+
