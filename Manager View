@@ -1,0 +1,198 @@
+/*
+ *
+ *
+ * Author: Josh Sampson
+ *
+ * Date: 12-11-20
+ */
+
+import java.sql.*;
+import java.io.*;
+
+class manager
+{
+
+    static BufferedReader keyboard;
+    static Connection conn; 
+    static Statement stmt;  
+
+    public static void main (String args [])
+	throws IOException
+    {
+	String username="user", password = "password";
+	String ename;
+	int original_empno=0;
+	int empno;
+
+	keyboard = new BufferedReader(new InputStreamReader (System.in));
+
+	try { 
+
+	   DriverManager.registerDriver(new oracle.jdbc.driver.OracleDriver());
+
+            System.out.println("Registered the driver...");
+
+	    conn = DriverManager.getConnection (
+                   "jdbc:oracle:thin:@oracle1.wiu.edu:1521/toolman.wiu.edu",
+		    username, password);
+
+	    conn.setAutoCommit(false);
+
+            System.out.println("logged into oracle as " + username);
+
+	    stmt = conn.createStatement ();
+
+	ResultSet rset=stmt.executeQuery ("select TNAME from TAB");
+
+
+	while(true){
+		int choice;
+		String n;
+		System.out.println("Press 1 to see a list of avalible tables, 2 to add employees, 3 to delete employees,4 to check inventory for a orgnizations shows, 5 to exit");
+		choice = Integer.parseInt(keyboard.readLine());
+		switch (choice){
+			case 1:
+				System.out.println("Press 1 for Employee table, 2 for Contact info, 3 for Inventory, 4 for upcoming shows, 5 for time cards, 6 for what equipment is needed for the show, 7 for the schedule");
+				choice = Integer.parseInt(keyboard.readLine());
+				showData(choice);// shows the table you choose
+				break;
+			case 2:
+				addEmp();//insert new employee in the right spots
+				break;
+			case 3:
+				System.out.println("Enter Employee ID (ex 123456)");
+				int id  = Integer.parseInt(keyboard.readLine());
+				System.out.println("Enter Employee's name ");
+				n = keyboard.readLine();
+				delEmp(id, n);//delete an employee
+				break;
+			case 4:
+				System.out.println("Enter orginaztion name: (ex Two Dogs)");
+				n = keyboard.readLine();
+				ItemAvail(n);// check if there is enough stock for these events
+				break;
+			case 5:
+				System.exit(0);
+		}
+	}
+	}
+
+	catch(SQLException e)
+	    {
+		System.out.println("Caught SQL Exception: \n     " + e);
+	    }
+    }
+
+	public static int newEID() throws SQLException{// creates new EID 1 higher than the previous newest
+		String query = ("SELECT MAX(EID) FROM Employee");
+		ResultSet nEID = stmt.executeQuery(query);
+		nEID.next();
+		int newEID = nEID.getInt(1) + 1;
+		nEID.close();
+		return newEID;
+	}
+
+	public static void showData(int n) throws SQLException{//general print no specific headings
+		String query = ("SELECT * FROM ");
+		String data = "";
+		switch (n){
+			case 1:
+				data = "Employee";
+				break;
+			case 2:
+				data = "ContactInfo";
+				break;
+			case 3:
+				data = "Equipment";
+				break;
+			case 4:
+				data = "Shows";
+				break;
+			case 5:
+				data = "TimeCard_hash";
+				break;
+			case 6:
+				data = "Needs";
+				break;
+			case 7:
+				data = "Works";
+				break;
+		}
+		query = ("SELECT * FROM " + data);
+		ResultSet dash = stmt.executeQuery(query);
+		ResultSetMetaData rsmd = dash.getMetaData();
+		int colCount = rsmd.getColumnCount();
+		System.out.println();
+		while(dash.next()){
+			for(int i=1; i<= colCount; i++){
+				System.out.printf("%30.30s", dash.getString(i));
+			}
+			System.out.println();
+		}
+		dash.close();
+	}
+	public static void addEmp() throws SQLException, IOException{//adding new employees
+		int EID = newEID();
+		String Name = "";
+		String Email = "";
+		double rate = 10.00;
+		System.out.println("Enter the name of the emploeyee ex( John Smith)");
+		Name = keyboard.readLine();
+		System.out.println("Enter the Email of the employee ex(jsmith@coolguy.com)");
+		Email = keyboard.readLine();
+		String in1 = ("INSERT INTO Employee VALUES (" +EID+ ", '"+Name+"', "
+			+rate+" )");
+
+		Statement ins = conn.createStatement();
+		ins.executeUpdate(in1);
+		System.out.println("Added to Employee");
+		//ins.close();
+		String in2 = ("INSERT INTO ContactInfo VALUES ( '"+Name+ "', '"+
+			Email+ "')");
+		String in4 = ("INSERT INTO EMPLOYEE_CLUS VALUES ( "+EID+ ", '"+Name+"',"+rate+" )");//this is useed in the view to find how much to pay in finMan
+		ins.executeUpdate(in2);
+		ins.executeUpdate(in4);
+		System.out.println("Added to Contact Info");
+		//ins.close();
+		String in3 = ("INSERT INTO TimeCard_hash VALUES ("+EID+",'"+// used to search faster for employee
+			Name+"', 1)");
+		String in5 = ("INSERT INTO TIMECARD_CLUS VALUES ("+EID+", '"+//this one too
+			Name+"', 1)");
+		ins.executeUpdate(in3);
+		System.out.println("Added to Time card");
+		ins.close();
+	}
+
+
+	public static void delEmp(int t, String n) throws SQLException{//delete query
+		int EID = t;
+		String Name = n;
+		String del1 = ("DELETE FROM EMPLOYEE WHERE EID = " +EID);
+		Statement ins = conn.createStatement();
+		ins.executeUpdate(del1);
+		System.out.println("Deleted from Employee and Time Card");
+		String del2 =("DELETE FROM CONTACTINFO WHERE Name = " +"'" + Name + "'");
+		ins.executeUpdate(del2);
+		System.out.println("Deleted from Contact info");
+	}
+	public static void ItemAvail(String n) throws SQLException{ //optimized search and grouping Needs is indexed to speed up search time
+		String query = ("SELECT NAMES, QTY, (SELECT COUNT(ID#) FROM NEEDS GROUP BY NAMES) FROM EQUIPMENT INNER JOIN NEEDS ON NEEDS.ID# = EQUIPMENT.ID# WHERE Names = "+"'"+n+"'");
+		String col1 = "Names";
+		String col2 = "Avalible";
+		String col3 = "Needed";
+		ResultSet IA = stmt.executeQuery(query);
+		ResultSetMetaData rsmd = IA.getMetaData();
+		int colCols = rsmd.getColumnCount();
+		System.out.printf("%-30.30s 30.30s 30.30s%n", col1, col2, col3);
+		while(IA.next()){
+			for(int i = 1; i<= colCols; i++){
+				System.out.printf("%30.30s", IA.getString(i));
+			}
+			System.out.println();
+		}
+		IA.close();
+	}
+
+}
+
+
