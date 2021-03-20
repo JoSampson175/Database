@@ -1,0 +1,129 @@
+/*
+ *
+ *
+ * Author: Josh Sampson
+ *
+ * Date: 12-11-20
+ */
+
+import java.sql.*;
+import java.io.*;
+
+class finMan
+{
+
+    static BufferedReader keyboard;
+    static Connection conn; 
+    static Statement stmt;  
+
+    public static void main (String args [])
+	throws IOException
+    {
+	String username="user", password = "password";
+	String ename;
+	int original_empno=0;
+	int empno;
+
+	keyboard = new BufferedReader(new InputStreamReader (System.in));
+
+	try { 
+
+	   DriverManager.registerDriver(new oracle.jdbc.driver.OracleDriver());
+
+            System.out.println("Registered the driver...");
+
+	    conn = DriverManager.getConnection (
+                   "jdbc:oracle:thin:@oracle1.wiu.edu:1521/toolman.wiu.edu",
+		    username, password);
+
+	    conn.setAutoCommit(false);
+
+            System.out.println("logged into oracle as " + username);
+
+	    stmt = conn.createStatement ();
+
+	ResultSet rset=stmt.executeQuery ("select TNAME from TAB");
+
+
+	while(true){
+		int choice;
+		System.out.println("Type 1 to view tables, 2 to see amount to pay each worker, 3 to reset the pay period, 4 to exit");
+		choice = Integer.parseInt(keyboard.readLine());
+		String n;
+		switch (choice){
+			case 1:
+				System.out.println("1 for Employee, 2 for billing, 3 for shows, 4 for time cards");
+				choice = Integer.parseInt(keyboard.readLine());
+				show(choice);//general print function
+				break;
+			case 2:
+				show(5);// special case of general print function
+				break;
+			case 3:
+				System.out.println("Are you sure? Y/N");//just in case of accident
+				n = keyboard.readLine();
+				if(n.equals("Y")){
+					clear();// updates all hours to 0 for new pay period
+					break;
+				}
+				break;
+			case 4:
+				System.exit(0);
+		}
+	}
+
+	}
+
+	catch(SQLException e)
+	    {
+		System.out.println("Caught SQL Exception: \n     " + e);
+	    }
+    }
+	public static void show(int n) throws SQLException{//general print function
+		String query = ("SELECT * FROM ");
+		String data = "";
+		switch(n){
+			case 1:
+				data ="Empolyee";
+				break; 
+			case 2:
+				data = "billing";
+				break;
+			case 3:
+				data = "Show";
+				break;
+			case 4:
+				data = "TimeCard_hash";
+				break;
+			case 5:
+				data = "toPay";// view using clustered files to join faster to show hours and pay rate
+				break;
+		}
+		query = ("SELECT * FROM " + data);
+		System.out.println(query);
+		ResultSet show = stmt.executeQuery(query);
+		ResultSetMetaData rsmd = show.getMetaData();
+		int colCount = rsmd.getColumnCount();
+		while(show.next()){
+			for(int i  = 1; i<=colCount; i++){
+				System.out.printf("%-30.30s", show.getString(i));
+			}
+			System.out.println();
+		}
+		show.close();
+	}
+	public static void clear() throws SQLException{// updates all hours to 0
+		String query = ("UPDATE TIMECARD_HASH SET Hours = 0");
+		Statement ins = conn.createStatement();
+		ins.execute(query);
+		System.out.println("Hours Reset");
+		ins.close();
+	}
+}
+
+/*
+ *
+ * FALL 2020 Validation Code (DO NOT DELETE):  ai12lWFfhj36kEHs
+ *
+ */
+
